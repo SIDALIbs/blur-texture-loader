@@ -22,7 +22,6 @@ HRESULT WINAPI HookedCreateTexture(void* Device, UINT Width, UINT Height, UINT L
     // Look for a replacement asset inside the local .\textures\ folder
     DWORD fileAttr = GetFileAttributesA(filePath.c_str());
     if (fileAttr != INVALID_FILE_ATTRIBUTES && !(fileAttr & FILE_ATTRIBUTE_DIRECTORY)) {
-        // Dynamically load the graphics extension helper to preserve compatibility
         HMODULE hD3DX = LoadLibraryA("d3dx9_43.dll");
         if (!hD3DX) hD3DX = LoadLibraryA("d3dx9_42.dll");
         
@@ -40,33 +39,38 @@ HRESULT WINAPI HookedCreateTexture(void* Device, UINT Width, UINT Height, UINT L
     return OriginalCreateTexture(Device, Width, Height, Levels, Usage, Format, Pool, ppTexture, pSharedHandle);
 }
 
-// Function pointer signature for the original CreateDevice method
-typedef HRESULT(WINAPI* CreateDevice_t)(void* pD3D, UINT Adapter, int DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, void* pPresentationParameters, void** ppReturnedDeviceInterface);
-CreateDevice_t OriginalCreateDevice = NULL;
-
-// Hooked CreateDevice to tap the rendering device the moment the game builds it
-HRESULT WINAPI HookedCreateDevice(void* pD3D, UINT Adapter, int DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, void* pPresentationParameters, void** ppReturnedDeviceInterface) {
-    HRESULT hr = OriginalCreateDevice(pD3D, Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
+// Custom wrapper class for IDirect3D9 to intercept ONLY the device creation cleanly
+class CustomIDirect3D9 {
+public:
+    void* originalD3D;
     
-    if (SUCCEEDED(hr) && ppReturnedDeviceInterface && *ppReturnedDeviceInterface) {
-        void* pDevice = *ppReturnedDeviceInterface;
-        uintptr_t* vtable = *(uintptr_t**)pDevice;
+    static HRESULT WINAPI HookedCreateDevice(void* pD3D, UINT Adapter, int DeviceType, HWND hFocusWindow, DWORD BehaviorFlags, void* pPresentationParameters, void** ppReturnedDeviceInterface) {
+        // Find the original function location from the VTable dynamically
+        uintptr_t* d3dVtable = *(uintptr_t**)pD3D;
+        typedef HRESULT(WINAPI* CreateDevice_Fn)(void*, UINT, int, HWND, DWORD, void*, void**);
+        CreateDevice_Fn RealCreateDevice = (CreateDevice_Fn)d3dVtable[16];
+        
+        HRESULT hr = RealCreateDevice(pD3D, Adapter, DeviceType, hFocusWindow, BehaviorFlags, pPresentationParameters, ppReturnedDeviceInterface);
+        
+        if (SUCCEEDED(hr) && ppReturnedDeviceInterface && *ppReturnedDeviceInterface) {
+            void* pDevice = *ppReturnedDeviceInterface;
+            uintptr_t* deviceVtable = *(uintptr_t**)pDevice;
 
-        // Index 23 is the CreateTexture function in the Direct3D 9 Device VTable
-        if ((CreateTexture_t)vtable[23] != HookedCreateTexture) {
-            OriginalCreateTexture = (CreateTexture_t)vtable[23];
-            
-            // Unprotect the memory page to swap the pointer
-            DWORD oldProtect;
-            VirtualProtect(&vtable[23], sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
-            vtable[23] = (uintptr_t)HookedCreateTexture;
-            VirtualProtect(&vtable[23], sizeof(uintptr_t), oldProtect, &oldProtect);
+            // Securely hook the CreateTexture pointer at index 23
+            if ((CreateTexture_t)deviceVtable[23] != HookedCreateTexture) {
+                OriginalCreateTexture = (CreateTexture_t)deviceVtable[23];
+                
+                DWORD oldProtect;
+                VirtualProtect(&deviceVtable[23], sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
+                deviceVtable[23] = (uintptr_t)HookedCreateTexture;
+                VirtualProtect(&deviceVtable[23], sizeof(uintptr_t), oldProtect, &oldProtect);
+            }
         }
+        return hr;
     }
-    return hr;
-}
+};
 
-// Main proxy interception at initial startup bootstrap
+// Main entry interceptor
 extern "C" void* WINAPI Direct3DCreate9(UINT SDKVersion) {
     char sysPath[MAX_PATH];
     GetSystemDirectoryA(sysPath, MAX_PATH);
@@ -82,15 +86,11 @@ extern "C" void* WINAPI Direct3DCreate9(UINT SDKVersion) {
     if (pD3DObject) {
         uintptr_t* vtable = *(uintptr_t**)pD3DObject;
         
-        // Index 16 is the CreateDevice function in the IDirect3D9 VTable
-        if ((CreateDevice_t)vtable[16] != HookedCreateDevice) {
-            OriginalCreateDevice = (CreateDevice_t)vtable[16];
-            
-            DWORD oldProtect;
-            VirtualProtect(&vtable[16], sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
-            vtable[16] = (uintptr_t)HookedCreateDevice;
-            VirtualProtect(&vtable[16], sizeof(uintptr_t), oldProtect, &oldProtect);
-        }
+        // Swap the CreateDevice method pointer directly at startup safely
+        DWORD oldProtect;
+        VirtualProtect(&vtable[16], sizeof(uintptr_t), PAGE_EXECUTE_READWRITE, &oldProtect);
+        vtable[16] = (uintptr_t)CustomIDirect3D9::HookedCreateDevice;
+        VirtualProtect(&vtable[16], sizeof(uintptr_t), oldProtect, &oldProtect);
     }
     return pD3DObject;
 }
