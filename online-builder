@@ -1,0 +1,29 @@
+name: Build D3D9 Proxy
+
+on: 
+  workflow_dispatch: # This lets you click a button to build it manually
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC Developer Command Prompt (32-bit x86)
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+
+    - name: Download Lightweight DirectX SDK Headers
+      run: nuget install Microsoft.DXSDK.D3DX -Version 9.29.1962 -OutputDirectory nuget
+
+    - name: Compile 32-bit DLL
+      run: |
+        cl.exe /O2 /LD /I nuget\Microsoft.DXSDK.D3DX.9.29.1962\build\native\include main.cpp /link /DEF:d3d9.def /OUT:d3d9.dll /LIBPATH:nuget\Microsoft.DXSDK.D3DX.9.29.1962\build\native\lib\x86 d3d9.lib User32.lib
+
+    - name: Upload Finished DLL
+      uses: actions/upload-artifact@v4
+      with:
+        name: Compiled-D3D9-DLL
+        path: d3d9.dll
