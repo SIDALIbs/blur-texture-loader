@@ -139,11 +139,11 @@ public:
     STDMETHOD(SetVertexShaderConstantB)(THIS_ UINT StartRegister,const BOOL* pConstantData,UINT  BoolCount) { return realDevice->SetVertexShaderConstantB(StartRegister, pConstantData, BoolCount); }
     STDMETHOD(GetVertexShaderConstantB)(THIS_ UINT StartRegister,BOOL* pConstantData,UINT BoolCount) { return realDevice->GetVertexShaderConstantB(StartRegister, pConstantData, BoolCount); }
     STDMETHOD(SetStreamSource)(THIS_ UINT StreamNumber,IDirect3DVertexBuffer9* pStreamData,UINT OffsetInBytes,UINT Stride) { return realDevice->SetStreamSource(StreamNumber, pStreamData, OffsetInBytes, Stride); }
-    运行HRESULT GetStreamSource(THIS_ UINT StreamNumber,IDirect3DVertexBuffer9** ppStreamData,UINT* pOffsetInBytes,UINT* pStride) { return realDevice->GetStreamSource(StreamNumber, ppStreamData, pOffsetInBytes, pStride); }
+    STDMETHOD(GetStreamSource)(THIS_ UINT StreamNumber,IDirect3DVertexBuffer9** ppStreamData,UINT* pOffsetInBytes,UINT* pStride) { return realDevice->GetStreamSource(StreamNumber, ppStreamData, pOffsetInBytes, pStride); }
     STDMETHOD(SetStreamSourceFreq)(THIS_ UINT StreamNumber,UINT Setting) { return realDevice->SetStreamSourceFreq(StreamNumber, Setting); }
     STDMETHOD(GetStreamSourceFreq)(THIS_ UINT StreamNumber,UINT* pSetting) { return realDevice->GetStreamSourceFreq(StreamNumber, pSetting); }
     STDMETHOD(SetIndices)(THIS_ IDirect3DIndexBuffer9* pIndexData) { return realDevice->SetIndices(pIndexData); }
-    STDMETHOD(GetIndices)(THIS_ IDirect3DIndexBuffer9** ppIndexData) { return realDevice->GetIndices(ppIndexData); }
+    STDMETHOD(GetIndices)(THIS_ IDirect3DIndexBuffer9** ppIndexData) { return realDevice->GetIndices(pIndexData); }
     STDMETHOD(CreatePixelShader)(THIS_ const DWORD* pFunction,IDirect3DPixelShader9** ppShader) { return realDevice->CreatePixelShader(pFunction, ppShader); }
     STDMETHOD(SetPixelShader)(THIS_ IDirect3DPixelShader9* pShader) { return realDevice->SetPixelShader(pShader); }
     STDMETHOD(GetPixelShader)(THIS_ IDirect3DPixelShader9** ppShader) { return realDevice->GetPixelShader(ppShader); }
@@ -157,6 +157,9 @@ public:
     STDMETHOD(DrawTriPatch)(THIS_ UINT Handle,const float* pNumSegs,const D3DTRIPATCH_INFO* pTriPatchInfo) { return realDevice->DrawTriPatch(Handle, pNumSegs, pTriPatchInfo); }
     STDMETHOD(DeletePatch)(THIS_ UINT Handle) { return realDevice->DeletePatch(Handle); }
     STDMETHOD(CreateQuery)(THIS_ D3DQUERYTYPE Type,IDirect3DQuery9** ppQuery) { return realDevice->CreateQuery(Type, ppQuery); }
+    
+    // Add missing abstract interface requirement explicitly
+    STDMETHOD(Present)(THIS_ const RECT* pSourceRect, const RECT* pDestinationRect, HWND hDestWindowOverride, const RGNDATA* pDirtyRegion) { return realDevice->Present(pSourceRect, pDestinationRect, hDestWindowOverride, pDirtyRegion); }
 };
 
 // Wrapper object for the master IDirect3D9 system instance
@@ -177,7 +180,7 @@ public:
     STDMETHOD(GetAdapterDisplayMode)(THIS_ UINT Adapter,D3DDISPLAYMODE* pMode) { return realD3D->GetAdapterDisplayMode(Adapter, pMode); }
     STDMETHOD(CheckDeviceType)(THIS_ UINT Adapter,D3DDEVTYPE DevType,D3DFORMAT DisplayFormat,D3DFORMAT BackBufferFormat,BOOL bWindowed) { return realD3D->CheckDeviceType(Adapter, DevType, DisplayFormat, BackBufferFormat, bWindowed); }
     STDMETHOD(CheckDeviceFormat)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DFORMAT AdapterFormat,DWORD Usage,D3DRESOURCETYPE RType,D3DFORMAT CheckFormat) { return realD3D->CheckDeviceFormat(Adapter, DeviceType, AdapterFormat, Usage, RType, CheckFormat); }
-    STDMETHOD(CheckDeviceMultiSampleType)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DFORMAT SurfaceFormat,BOOL Windowed,D3DMULTISAMPLE_TYPE MultiSampleType,DWORD* pQualityLevels) { return realDevice->CheckDeviceMultiSampleType(Adapter, DeviceType, SurfaceFormat, Windowed, MultiSampleType, pQualityLevels); }
+    STDMETHOD(CheckDeviceMultiSampleType)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DFORMAT SurfaceFormat,BOOL Windowed,D3DMULTISAMPLE_TYPE MultiSampleType,DWORD* pQualityLevels) { return realD3D->CheckDeviceMultiSampleType(Adapter, DeviceType, SurfaceFormat, Windowed, MultiSampleType, pQualityLevels); }
     STDMETHOD(CheckDepthStencilMatch)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DFORMAT AdapterFormat,D3DFORMAT RenderTargetFormat,D3DFORMAT DepthStencilFormat) { return realD3D->CheckDepthStencilMatch(Adapter, DeviceType, AdapterFormat, RenderTargetFormat, DepthStencilFormat); }
     STDMETHOD(CheckDeviceFormatConversion)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DFORMAT SourceFormat,D3DFORMAT TargetFormat) { return realD3D->CheckDeviceFormatConversion(Adapter, DeviceType, SourceFormat, TargetFormat); }
     STDMETHOD(GetDeviceCaps)(THIS_ UINT Adapter,D3DDEVTYPE DeviceType,D3DCAPS9* pCaps) { return realD3D->GetDeviceCaps(Adapter, DeviceType, pCaps); }
